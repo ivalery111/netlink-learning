@@ -6,6 +6,25 @@
 #define NETLINK_TEST_PROTOCOL 31
 
 /**
+ * @brief This function prints all field of struct nlmsghdr
+ *
+ * @return void - nothing
+ */
+static void nlmsg_dump(struct nlmsghdr *nlh)
+{
+    if(!nlh){
+        printk(KENR_INFO "nlmsg_len  : %u", nlh->nlmsg_len);
+        printk(KENR_INFO "nlmsg_type : %u", nlh->nlmsg_type);
+        printk(KENR_INFO "nlmsg_flags: %u", nlh->nlmsg_flags);
+        printk(KENR_INFO "nlmsg_seq  : %u", nlh->nlmsg_seq);
+        printk(KENR_INFO "nlmsg_pid  : %u", nlh->nlmsg_pid);
+    }
+    else{
+        printk(KERN_INFO "nlmsg_dump: can't print nlmsghdr's fields")
+    }
+}
+
+/**
  * @brief With this socket I will send/receive the data from user-space.
  */
 static struct sock *nl_sk = NULL;
