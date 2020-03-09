@@ -34,6 +34,22 @@ static struct sock *nl_sk = NULL;
  */
 static void netlink_recv_msg_fn(struct sk_buff *skb)
 {
+    struct nlmsghdr *nlh_recv, *nlh_reply;
+    int user_space_proc_port_id, user_space_data_len;
+    char *user_space_data;
+
+    printk(KERN_INFO "%s invoked", __FUNCTION__);
+
+    nlh_recv = (struct nlmsghdr *)(skb->data);
+    nlmsg_dump(nlh_recv);
+
+    user_space_proc_port_id = nlh_recv->nlmsg_pid;
+    printk(LERN_INFO "%s[%d]: port id of the sending user-space process = %u", __FUNCTION__, __LINE__, user_space_proc_port_id);
+
+    user_space_data = (char *)nlmsg_data(nlh_recv);
+    user_space_data_len = nlh_recv->nlmsg_len;
+    printk(KERN_INFO "%s[%d]: msg recv from user-space = %s, skb->len = %d, nlh->nlmsg_len = %d",
+           __FUNCTION__, __LINE__, user_space_data, user_space_data_len, nlh_recv->nlmsg_len);
 }
 
 /**
