@@ -2,6 +2,7 @@
 #include <linux/netlink.h>
 #include <net/sock.h>
 #include <linux/string.h>
+#include <stdio.h>
 
 #define NETLINK_TEST_PROTOCOL 31
 
@@ -35,8 +36,10 @@ static struct sock *nl_sk = NULL;
 static void netlink_recv_msg_fn(struct sk_buff *skb)
 {
     struct nlmsghdr *nlh_recv, *nlh_reply;
-    int user_space_proc_port_id, user_space_data_len;
+    int user_space_proc_port_id, user_space_data_len, res;
     char *user_space_data;
+    char kernel_reply[256];  /* memory for kernel's reply to user-space */
+    struct sk_buff *skb_out; /* this socket buffer will be send to user-space */
 
     printk(KERN_INFO "%s invoked", __FUNCTION__);
 
@@ -50,6 +53,32 @@ static void netlink_recv_msg_fn(struct sk_buff *skb)
     user_space_data_len = nlh_recv->nlmsg_len;
     printk(KERN_INFO "%s[%d]: msg recv from user-space = %s, skb->len = %d, nlh->nlmsg_len = %d",
            __FUNCTION__, __LINE__, user_space_data, user_space_data_len, nlh_recv->nlmsg_len);
+
+    /* If user-space set NLM_F_ACK to 'ON' than the kernel send a message back to the user-space */
+    if( nlh_recv->nlmsg_flags & NLM_F_ACK)
+    {
+        memset(kernel_reply, 0, sizeof(kernel_reply));
+        snprintf(kernel_reply, sizeof(kernel_reply), "Msg from %d has been precessed by kernel", nlh_recv->nlmsg_pid);
+
+        /* prepare sokcet buffer */
+        skb_out = nlmsg_new(sizeof(kernel_reply), 0);
+
+        /* add a netlink message to an skb */
+        nlh_reply = nlmsg_put(skb_out,
+                              0,                    /* kernel is sender -> port id = 0 */
+                              nlh_recv->nlmsg_seq,
+                              NLMSG_DONE,
+                              sizeof(kernel_reply),
+                              0);
+
+        /* sending a message */
+        res = nlmsg_unicast(nl_sk, skb_out, user_space_proc_port_id);
+        if( res < 0)
+        {
+            printk(KERN_INFO "Can't send a data back to user-space");
+            kfree(skb_out);
+        }
+    }
 }
 
 /**
