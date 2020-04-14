@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#define NETLINK_PROTOCOL_NUM 31
+
+int create_nl_socket(int nl_proto);
 /**
  * Returns the number of sent bytes */
 int send_nl_msg_to_kernel(int sock_fd,
@@ -58,4 +61,20 @@ int send_nl_msg_to_kernel(int sock_fd,
     }
 
     return send_bytes;
+}
+
+int create_nl_socket(int nl_proto)
+{
+    int socket_fd = socket(PF_NETLINK, SOCK_RAW, nl_proto);
+    if (socket_fd < 0)
+    {
+        perror("Netlink socket creation failed: ");
+        exit(EXIT_FAILURE);
+    }
+    return socket_fd;
+}
+
+int main(void)
+{
+    int socket_fd = create_nl_socket(NETLINK_PROTOCOL_NUM);
 }
