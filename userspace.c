@@ -77,4 +77,15 @@ int create_nl_socket(int nl_proto)
 int main(void)
 {
     int socket_fd = create_nl_socket(NETLINK_PROTOCOL_NUM);
+
+    struct sockaddr_nl src_dst;
+    memset(&src_dst, 0, sizeof(src_dst));
+    src_dst.nl_family = AF_NETLINK;
+    src_dst.nl_pid = getpid();
+
+    if (bind(socket_fd, (struct sockaddr *)&src_dst, sizeof(src_dst)) == -1)
+    {
+        perror("Bind failed: ");
+        exit(EXIT_FAILURE);
+    }
 }
