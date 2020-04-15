@@ -1,91 +1,65 @@
 #include <stdio.h>
-#include <errno.h>
 #include <linux/netlink.h>
-#include <sys/socket.h> /* for AF_NETLINK */
-#include <sys/uio.h>    /* for iovec */
-#include <errno.h>
-#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h> /* for getpid() */
+#include <unistd.h>    /* for getpid() */
 #include <stdlib.h>
-#include <memory.h>
-#include <stdint.h>
-#include <pthread.h>
-
-#define NETLINK_PROTOCOL_NUM 31
-
-int create_nl_socket(int nl_proto);
-/**
- * Returns the number of sent bytes */
-int send_nl_msg_to_kernel(int sock_fd,
-                          char *msg,
-                          uint32_t msg_size,
-                          int nlmsg_type,
-                          uint16_t flags);
-
-int send_nl_msg_to_kernel(int sock_fd,
-                          char *msg,
-                          uint32_t msg_size,
-                          int nlmsg_type,
-                          uint16_t flags)
-{
-    /* 1 step: prepare nlmsghdr with payload */
-    struct sockaddr_nl dest_addr;
-    memset(&dest_addr, 0, sizeof(dest_addr));
-    dest_addr.nl_family = AF_NETLINK;
-    dest_addr.nl_pid = 0; /* 0 because a kernel is destination */
-
-    struct nlmsghdr *nl_hdr = (struct nlmsghdr *)calloc(1, NLMSG_HDRLEN + NLMSG_SPACE(msg_size));
-    nl_hdr->nlmsg_len = NLMSG_HDRLEN + NLMSG_SPACE(msg_size);
-    nl_hdr->nlmsg_pid = getpid();
-    nl_hdr->nlmsg_type = nlmsg_type;
-    nl_hdr->nlmsg_seq = 0;
-    strncpy(NLMSG_DATA(nl_hdr), msg, msg_size);
-
-    /* 2 step: wrap the message into iovec */
-    struct iovec iov;
-    iov.iov_base = (void *)nl_hdr;
-    iov.iov_len = nl_hdr->nlmsg_len;
-
-    /* 3 step: wrap the iovec into struct msghdr */
-    struct msghdr outer_msg_hdr;
-    memset(&outer_msg_hdr, 0, sizeof(struct msghdr));
-    outer_msg_hdr.msg_name = (void *)&dest_addr;
-    outer_msg_hdr.msg_namelen = sizeof(dest_addr);
-    outer_msg_hdr.msg_iov = &iov;
-    outer_msg_hdr.msg_iovlen = 1;
-
-    /* 4 step: send through sendmsg */
-    int send_bytes = sendmsg(sock_fd, &outer_msg_hdr, 0);
-    if (send_bytes < 0)
-    {
-        printf("Message sending error: %d\n", errno);
-    }
-
-    return send_bytes;
-}
-
-int create_nl_socket(int nl_proto)
-{
-    int socket_fd = socket(PF_NETLINK, SOCK_RAW, nl_proto);
-    if (socket_fd < 0)
-    {
-        perror("Netlink socket creation failed: ");
-        exit(EXIT_FAILURE);
-    }
-    return socket_fd;
-}
+#include <string.h>
+#include "utils.h"
 
 int main(void)
 {
-    int socket_fd = create_nl_socket(NETLINK_PROTOCOL_NUM);
-
-    struct sockaddr_nl src_dst;
-    memset(&src_dst, 0, sizeof(src_dst));
-    src_dst.nl_family = AF_NETLINK;
-    src_dst.nl_pid = getpid();
-
-    if (bind(socket_fd, (struct sockaddr *)&src_dst, sizeof(src_dst)) == -1)
+    /* create netlink socket */
+    int socket_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_PROTO_TEST);
+    if (socket_fd == -1)
     {
-        perror("Bind failed: ");
+        perror("socket creation failed: ");
         exit(EXIT_FAILURE);
     }
+
+    /* prepare data for sending */
+    struct sockaddr_nl src_addr = {0};
+    src_addr.nl_family = AF_NETLINK;
+    src_addr.nl_pid = getpid();
+
+    if (bind(socket_fd, (struct sockaddr *)&src_addr, sizeof(src_addr)) == -1)
+    {
+        perror("bind failed: ");
+        exit(EXIT_FAILURE);
+    }
+
+    struct sockaddr_nl dst_addr = {0};
+    dst_addr.nl_family = AF_NETLINK;
+    dst_addr.nl_pid = 0; /* Always zero for kernel */
+
+    /* 1 step: prepare nlmsghdr with payload */
+    struct nlmsghdr *msg_hdr = calloc(1, NLMSG_HDRLEN + NLMSG_SPACE(MAX_PAYLOAD));
+    msg_hdr->nlmsg_len = NLMSG_HDRLEN + NLMSG_SPACE(MAX_PAYLOAD);
+    msg_hdr->nlmsg_pid = getpid();
+    msg_hdr->nlmsg_type = NLMSG_HELLO;
+    msg_hdr->nlmsg_seq = 0;
+    msg_hdr->nlmsg_flags |= NLM_F_REQUEST; /* ? */
+    strncpy(NLMSG_DATA(msg_hdr), "MSG: Hello!", 12);
+
+    /* 2 step: wrap the message into iovec */
+    struct iovec iov = {0};
+    iov.iov_base = (void *)msg_hdr;
+    iov.iov_len = msg_hdr->nlmsg_len;
+
+    /* 3 step: wrap the iovec into struct msghdr */
+    static struct msghdr outer_msg_hdr = {0};
+    outer_msg_hdr.msg_name = (void *)&dst_addr;
+    outer_msg_hdr.msg_namelen = sizeof(dst_addr); /* To whom sending a message? */
+    outer_msg_hdr.msg_iov = &iov;
+    outer_msg_hdr.msg_iovlen = 1;
+
+    /* 4 step: sending */
+    int sent_bytes = sendmsg(socket_fd, &outer_msg_hdr, 0);
+    if (sent_bytes < 0)
+    {
+        perror("msg sending failed: ");
+        exit(EXIT_FAILURE);
+    }
+    printf("sent %d bytes!\n", sent_bytes);
+    return 0;
 }
