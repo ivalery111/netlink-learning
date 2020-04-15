@@ -43,7 +43,7 @@ int main(void)
 
     /* 2 step: wrap the message into iovec */
     struct iovec iov = {0};
-    iov.iov_base = (void *)&msg_hdr;
+    iov.iov_base = (void *)msg_hdr;
     iov.iov_len = msg_hdr->nlmsg_len;
 
     /* 3 step: wrap the iovec into struct msghdr */
