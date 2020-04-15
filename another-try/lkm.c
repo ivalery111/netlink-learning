@@ -39,4 +39,5 @@ module_exit(netlink_exit);
 
 static void nl_recv_msg_fn(struct sk_buff *skb)
 {
+    printk(KERN_INFO "%s invoked.\n", __FUNCTION__);
 }
