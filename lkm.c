@@ -39,5 +39,15 @@ module_exit(netlink_exit);
 
 static void nl_recv_msg_fn(struct sk_buff *skb)
 {
+    struct nlmsghdr *recv_msg = NULL;
+
     printk(KERN_INFO "%s invoked.\n", __FUNCTION__);
+
+    recv_msg = (struct nlmsghdr *)(skb->data);
+    if (recv_msg == NULL)
+    {
+        printk(KERN_INFO "[%d]: Invalid recv_msg pointer!\n", __LINE__);
+        return;
+    }
+    dump_msg(recv_msg);
 }
