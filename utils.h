@@ -8,8 +8,9 @@
 #include <memory.h>
 #endif
 
-#define NETLINK_PROTO_TEST 31
+#define NETLINK_PROTO_TEST 24
 #define MAX_PAYLOAD 1024
+#define KERN_REPLY_MSG_LEN 256
 
 /* user defined NLMSG type, should be > 16 */
 #define NLMSG_HELLO 31

@@ -3,9 +3,16 @@
 #include <sys/socket.h>
 #include <sys/types.h> /* for getpid() */
 #include <unistd.h>    /* for getpid() */
+#include <stdint.h>    /* for uint32_t */
 #include <stdlib.h>
 #include <string.h>
 #include "utils.h"
+
+uint32_t get_new_seq_num()
+{
+    static uint32_t seq_num = 0;
+    return seq_num++;
+}
 
 int main(void)
 {
@@ -37,7 +44,7 @@ int main(void)
     msg_hdr->nlmsg_len = NLMSG_HDRLEN + NLMSG_SPACE(MAX_PAYLOAD);
     msg_hdr->nlmsg_pid = getpid();
     msg_hdr->nlmsg_type = NLMSG_HELLO;
-    msg_hdr->nlmsg_seq = 0;
+    msg_hdr->nlmsg_seq = get_new_seq_num();
     msg_hdr->nlmsg_flags |= NLM_F_REQUEST; /* ? */
     strncpy(NLMSG_DATA(msg_hdr), "MSG: Hello!", 12);
 
@@ -61,5 +68,17 @@ int main(void)
         exit(EXIT_FAILURE);
     }
     printf("sent %d bytes!\n", sent_bytes);
+
+    printf("Waiting for msg from a kernel:\n");
+    int received_bytes = recvmsg(socket_fd, &outer_msg_hdr, 0);
+    if (received_bytes < 0)
+    {
+        perror("recvmsg: ");
+        exit(EXIT_FAILURE);
+    }
+    printf("Received msg: %s\n", (char *)NLMSG_DATA(msg_hdr));
+
+    close(socket_fd);
+
     return 0;
 }
